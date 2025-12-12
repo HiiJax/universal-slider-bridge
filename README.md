@@ -3,7 +3,8 @@ This is my very first Rust code, I know it's rough. Right now, it's just a simpl
 
 ## To-Do:
 There's many improvements I'd like to make to this. My (very) long term goal is a fully open source alternative to Sonar. But for now...
-- [ ] Retry on a timeout on connection failure to VoiceMeeter, instead of panicking
+- [X] Retry on a timeout on connection failure to VoiceMeeter, instead of panicking
+- [ ] Handle VoiceMeeter closing after a connection has been made
 - [ ] Improve error handling
 - [ ] Run in tray
 - [ ] Auto start option
