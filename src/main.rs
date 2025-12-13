@@ -9,16 +9,7 @@ fn main() {
 
     let mut remote = VoicemeeterRemote::new().expect("Failed initialize VoiceMeeter API");
 
-    let voicemeeter_type = loop {
-        match remote.get_voicemeeter_type() {
-            Ok(t) => break t,
-            Err(e) => println!("Error getting VoiceMeeter type. (Error: {}) Is VoiceMeeter running? Retrying in 5s...", e)
-        };
-        thread::sleep(Duration::from_secs(5));
-    };
-    println!("Type detected: {}", voicemeeter_type);
-
-    remote.program = voicemeeter_type;
+    set_vm_type(&mut remote);
 
     println!("VoiceMeeter connected.");
 
@@ -39,7 +30,14 @@ fn main() {
         println!("Listening for ChatMix adjustments... (q to quit)");
         loop {
             // Update parameters
-            remote.is_parameters_dirty().expect("Could not check parameters");
+            match remote.is_parameters_dirty() {
+                Ok(_x) => {}
+                Err(e) => {
+                    println!("Could not check parameters. (Error: {})", e);
+                    thread::sleep(Duration::from_secs(5));
+                    set_vm_type(&mut remote);
+                }
+            }
             // Read data from device
             let mut buf = [0u8; 8];
             device.read_timeout(&mut buf[..], 500).unwrap();
@@ -96,4 +94,17 @@ fn main() {
     } else {
         println!("Bad exit! VoiceMeeter Remote not stopped!");
     }
+}
+
+fn set_vm_type(remote: &mut VoicemeeterRemote) {
+    let voicemeeter_type = loop {
+        match remote.get_voicemeeter_type() {
+            Ok(t) => break t,
+            Err(e) => println!("Error getting VoiceMeeter type. (Error: {}) Is VoiceMeeter running? Retrying in 5s...", e)
+        };
+        thread::sleep(Duration::from_secs(5));
+    };
+    println!("Type detected: {}", voicemeeter_type);
+
+    remote.program = voicemeeter_type;
 }
