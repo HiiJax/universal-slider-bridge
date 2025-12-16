@@ -24,5 +24,5 @@ jobs:
     - name: Upload release artifact
       uses: actions/upload-artifact@v4
       with:
-        name: <my-app>
-        path: target/release/<my-app>.exe
+        name: universal-slider-bridge
+        path: target/release/universal-slider-bridge.exe
