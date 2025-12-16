@@ -4,24 +4,22 @@ use std::thread;
 use std::time::Duration;
 use voicemeeter::VoicemeeterRemote;
 
+const PLATFORM: &str = "windows";
+
 fn main() {
     println!("Connecting to VoiceMeeter...");
-
     let mut remote = VoicemeeterRemote::new().expect("Failed initialize VoiceMeeter API");
-
     set_vm_type(&mut remote);
-
     println!("VoiceMeeter connected.");
 
     // Channel for quitting gracefully
     let (tx, rx) = mpsc::channel();
 
-    // What strips are we controlling?
+    // Temporarily hardcoded ChatMix variables
     let game_strip = 3;
     let chat_strip = 4;
-
-    // Set HID vendor and product IDs
     let (vid, pid) = (0x1038, 0x2258);
+    let chatmix_hid = 69;
 
     let api = hidapi::HidApi::new().unwrap();
 
@@ -29,37 +27,15 @@ fn main() {
         let device = api.open(vid, pid).unwrap();
         println!("Listening for ChatMix adjustments... (q to quit)");
         loop {
-            // Update parameters
-            match remote.is_parameters_dirty() {
-                Ok(_x) => {}
-                Err(e) => {
-                    println!("Could not check parameters. (Error: {})", e);
-                    thread::sleep(Duration::from_secs(5));
-                    set_vm_type(&mut remote);
-                }
-            }
+            vm_healthcheck(&mut remote);
             // Read data from device
             let mut buf = [0u8; 8];
             device.read_timeout(&mut buf[..], 500).unwrap();
-            if buf[0] == 69 {
-                let game_val: f32 = buf[1].into();
-                let chat_val: f32 = buf[2].into();
-                let new_game_gain = (game_val / 100.00) * 40.00 - 40.00;
-                let new_chat_gain = (chat_val / 100.00) * 40.00 - 40.00;
-                remote
-                    .parameters()
-                    .strip(game_strip)
-                    .expect("Failed to reach game strip")
-                    .gain()
-                    .set(new_game_gain)
-                    .expect("Failed to set gain");
-                remote
-                    .parameters()
-                    .strip(chat_strip)
-                    .expect("Failed to reach chat strip")
-                    .gain()
-                    .set(new_chat_gain)
-                    .expect("Failed to set gain");
+            if buf[0] == chatmix_hid {
+                let game_percent: f32 = buf[1].into();
+                let chat_percent: f32 = buf[2].into();
+                set_gain(&mut remote, game_strip, game_percent);
+                set_gain(&mut remote, chat_strip, chat_percent);
             }
             if rx.try_recv().is_ok() {
                 println!("Disconnecting from VoiceMeeter...");
@@ -107,4 +83,32 @@ fn set_vm_type(remote: &mut VoicemeeterRemote) {
     println!("Type detected: {}", voicemeeter_type);
 
     remote.program = voicemeeter_type;
+}
+
+fn vm_healthcheck(remote: &mut VoicemeeterRemote) {
+    match remote.is_parameters_dirty() {
+        Ok(_x) => {}
+        Err(e) => {
+            println!("Could not check parameters. (Error: {})", e);
+            thread::sleep(Duration::from_secs(5));
+            set_vm_type(remote);
+        }
+    }
+}
+
+fn set_gain(remote: &mut VoicemeeterRemote, id: i32, percent: f32) {
+    let gain = (percent / 100.00) * 40.00 - 40.00;
+    if PLATFORM == "windows" {
+        set_vm_gain(remote, id, gain);
+    }
+}
+
+fn set_vm_gain(remote: &mut VoicemeeterRemote, strip: i32, gain: f32) {
+    remote
+        .parameters()
+        .strip(strip)
+        .expect("Failed to reach game strip")
+        .gain()
+        .set(gain)
+        .expect("Failed to set gain");
 }
